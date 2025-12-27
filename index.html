@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>タップRPG 完全版</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+body{background:#111;color:#fff;font-family:sans-serif;text-align:center;margin:0;padding:20px}
+button,input{font-size:18px;padding:10px 20px;margin:6px}
+#tapBtn{font-size:28px;padding:30px 60px;margin-top:20px}
+.hidden{display:none}
+.boss{font-size:80px}
+.player{font-size:60px}
+.hp-bar{width:80%;height:20px;background:#444;margin:10px auto;border-radius:10px;overflow:hidden}
+.hp{height:100%;background:red}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.9);display:flex;justify-content:center;align-items:center;z-index:999;font-size:22px;text-align:center;padding:20px}
+.rare{color:#4af}.sr{color:#c6f}.hr{color:#fa4}.ur{color:gold}
+.lr{background:linear-gradient(45deg,red,orange,yellow,green,cyan,blue,purple);
+-webkit-background-clip:text;color:transparent;font-weight:bold}
+</style>
+</head>
+<body>
+
+<h1>🔥 タップRPG 🔥</h1>
+
+<p>
+💰 <span id="coin">0</span>
+　💎 <span id="dia">0</span>
+　⚔ +<span id="atk">0</span>
+</p>
+
+<div class="player" id="player">🙂</div>
+
+<button onclick="drawGacha()">🎰 ガチャ</button>
+<button onclick="draw10()">🎰 10連</button>
+<button onclick="drawDiaGacha()">💎 上位ガチャ</button>
+<button onclick="showDex()">📖 図鑑</button>
+
+<hr>
+
+<input id="diaNum" type="number" min="1" placeholder="変換数">
+<button onclick="exchangeDia()">💰→💎変換</button>
+
+<hr>
+
+<div id="select">
+<h2>ボス選択</h2>
+<button onclick="startBattle('スライム',100,'🟢',10)">スライム</button>
+<button onclick="startBattle('ドラゴン',500,'🐉',50)">ドラゴン</button>
+<button onclick="startBattle('神竜',5000,'🐲✨',500)">神竜</button>
+<button onclick="startBattle('虚無王',50000,'🕳️👑',3000)">虚無王</button>
+<button onclick="startBattle('終焉竜',150000,'💀🐉',8000)">終焉竜</button>
+<button onclick="startBattle('創世神',300000,'🌌✨',15000)">創世神</button>
+<br><br>
+<button onclick="startRush()">🔥 ボスラッシュ</button>
+</div>
+
+<div id="game" class="hidden">
+<h2 id="bossName"></h2>
+<div class="boss" id="bossIcon"></div>
+<div class="hp-bar"><div class="hp" id="hp"></div></div>
+<p>HP: <span id="hpText"></span></p>
+<button id="tapBtn">タップ！</button>
+</div>
+
+<div id="overlay" class="overlay hidden"></div>
+
+<script>
+let coin=+localStorage.getItem("coin")||0;
+let dia=+localStorage.getItem("dia")||0;
+let atkBonus=+localStorage.getItem("atkBonus")||0;
+let dex=JSON.parse(localStorage.getItem("dex")||"{}");
+
+let bossHp=0,maxHp=0,reward=0;
+let rush=false,rushKills=0,rushEnd=0;
+
+const coinEl=coinSpan=document.getElementById("coin");
+const diaEl=document.getElementById("dia");
+const atkEl=document.getElementById("atk");
+const overlay=document.getElementById("overlay");
+const player=document.getElementById("player");
+
+coinEl.textContent=coin;
+diaEl.textContent=dia;
+atkEl.textContent=atkBonus.toFixed(1);
+updatePlayer();
+
+function updatePlayer(){
+player.textContent=
+atkBonus>=10?"👑🔥":
+atkBonus>=5?"😎✨":"🙂";
+}
+
+function save(){
+localStorage.setItem("coin",coin);
+localStorage.setItem("dia",dia);
+localStorage.setItem("atkBonus",atkBonus);
+localStorage.setItem("dex",JSON.stringify(dex));
+coinEl.textContent=coin;
+diaEl.textContent=dia;
+atkEl.textContent=atkBonus.toFixed(1);
+updatePlayer();
+}
+
+function showOverlay(html){
+overlay.innerHTML=html+"<br><br><small>(タップで閉じる)</small>";
+overlay.classList.remove("hidden");
+}
+overlay.onclick=()=>overlay.classList.add("hidden");
+
+/* ===== ガチャ ===== */
+const table=[
+["LR",2,1.5,"lr"],
+["UR",5,1,"ur"],
+["HR",15,0.5,"hr"],
+["SR",28,0.3,"sr"],
+["R",50,0.1,"rare"]
+];
+
+function roll(){
+let r=Math.random()*100,sum=0;
+for(let g of table){
+sum+=g[1];
+if(r<sum)return g;
+}
+}
+
+function drawGacha(){
+if(coin<100)return showOverlay("コイン不足");
+coin-=100;
+let g=roll();
+atkBonus+=g[2];
+dex[g[0]]=(dex[g[0]]||0)+1;
+save();
+showOverlay(`<div class="${g[3]}">${g[0]}<br>+${g[2]}</div>`);
+}
+
+function draw10(){
+if(coin<1000)return showOverlay("コイン不足");
+coin-=1000;
+let r="<h3>🎰 10連結果</h3>";
+for(let i=0;i<10;i++){
+let g=roll();
+atkBonus+=g[2];
+dex[g[0]]=(dex[g[0]]||0)+1;
+r+=`<div class="${g[3]}">${g[0]} +${g[2]}</div>`;
+}
+save();
+showOverlay(r);
+}
+
+function drawDiaGacha(){
+if(dia<1)return showOverlay("ダイヤ不足");
+dia--;
+atkBonus+=5;
+save();
+showOverlay("<div class='ur'>💎 神引き +5</div>");
+}
+
+/* ===== 変換 ===== */
+function exchangeDia(){
+let n=+diaNum.value;
+if(!n||coin<n*1000)return showOverlay("コイン不足");
+coin-=n*1000;
+dia+=n;
+save();
+showOverlay(`💎 +${n}`);
+}
+
+/* ===== 図鑑 ===== */
+function showDex(){
+let h="<h2>📖 図鑑</h2>";
+for(let k in dex)h+=`${k} × ${dex[k]}<br>`;
+showOverlay(h);
+}
+
+/* ===== ボスラッシュ ===== */
+function getRushBoss(){
+let k=rushKills;
+if(k<5) return {n:"雑魚",i:"👾",h:300+k*100};
+if(k<10) return {n:"兵",i:"⚔️👹",h:1200+(k-5)*400};
+if(k<20) return {n:"将軍",i:"🔥😈",h:5000+(k-10)*1500};
+return {n:"覇王",i:"🌌👑",h:20000+(k-20)*6000};
+}
+
+function startRush(){
+rush=true;
+rushKills=0;
+rushEnd=Date.now()+60000;
+spawnRush();
+select.classList.add("hidden");
+game.classList.remove("hidden");
+}
+
+function spawnRush(){
+let b=getRushBoss();
+bossName.textContent="ラッシュ"+b.n;
+bossIcon.textContent=b.i;
+bossHp=maxHp=b.h;
+updateHp();
+}
+
+/* ===== バトル ===== */
+function startBattle(n,h,i,r){
+rush=false;
+bossName.textContent=n;
+bossIcon.textContent=i;
+bossHp=maxHp=h;
+reward=r;
+select.classList.add("hidden");
+game.classList.remove("hidden");
+updateHp();
+}
+
+tapBtn.onclick=()=>{
+bossHp-=1+atkBonus;
+if(bossHp<=0){
+if(rush){
+rushKills++;
+if(Date.now()>rushEnd){
+coin+=rushKills*20;
+save();
+game.classList.add("hidden");
+select.classList.remove("hidden");
+showOverlay(`🔥 ラッシュ終了<br>討伐数 ${rushKills}<br>💰 +${rushKills*20}`);
+return;
+}
+spawnRush();
+}else{
+coin+=reward;
+save();
+game.classList.add("hidden");
+select.classList.remove("hidden");
+showOverlay(`🎉 撃破！<br>💰 +${reward}`);
+return;
+}
+}
+updateHp();
+};
+
+function updateHp(){
+hpText.textContent=Math.ceil(bossHp);
+hp.style.width=(bossHp/maxHp*100)+"%";
+}
+</script>
+</body>
+</html>
